@@ -3,26 +3,67 @@
 # Configure monitored ports
 monitored_tcp=(21 22 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
 monitored_udp=(123 1194 4500 5000-5110 7000-7007)
+allports=''
+index=0
 
 for port in ${monitored_udp[@]}
   do
+  # check for ranges in array and expand them
   if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
   then
     range_start="${BASH_REMATCH[1]}"
     range_end="${BASH_REMATCH[2]}"
-#    if [[ $range_start -lt $range_end ]] ;
-#    then
-#      for ((i=1, j=10; i <= 5 ; i++, j=j+5))
-#        do
-    echo "Range from $range_start to $range_end"
-  else
-    echo $port
+    if [[ $range_start -lt $range_end ]] ;
+    then
+      for ((i=$range_start; i <= $range_end; i++))
+      do
+#	echo "added $i at $index"
+      done
+    else
+      echo "Range starts with value larger than the one it ends with"
+      exit 1
+    fi
+  # if not a range just add it
+  elif [[ $port =~ ^[0-9]+$ ]]
+  then
+#    echo "added $port at $index"
+  else 
+    echo "Please check monitored ports configuration, $port doesn't look right"
+    exit 1
   fi
-
-
 done
 
 
+for port in ${monitored_tcp[@]}
+  do
+  # check for ranges in array and expand them
+  if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
+  then
+    range_start="${BASH_REMATCH[1]}"
+    range_end="${BASH_REMATCH[2]}"
+    if [[ $range_start -lt $range_end ]] ;
+    then
+      for ((i=$range_start; i <= $range_end; i++))
+      do
+        allports[$index]=$i
+       echo "added $i at $index"
+        ((index++))
+      done
+    else
+      echo "Range starts with value larger than the one it ends with"
+      exit 1
+    fi
+  # if not a range just add it
+  elif [[ $port =~ ^[0-9]+$ ]]
+  then
+    allports[$index]=$port
+    echo "added $port at $index"
+    ((index++))
+  else
+    echo "Please check monitored ports configuration, $port doesn't look right"
+    exit 1
+  fi
+done
 
 
 
