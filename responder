@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# read the string supplied by the probe
+read response
+
+# it should be in format probeID:proto:port
+regex="([0-9]+):(tcp|udp):([0-9]+)"
+
+# if data is in the expected format
+if [[ "$response" =~ $regex ]];
+then
+# set variables based on supplied string
+  id="${BASH_REMATCH[1]}"
+  protocol="${BASH_REMATCH[2]}"
+  port="${BASH_REMATCH[3]}"
+# get the locally stored salt for this probe ID
+  salt=`grep "$id" "probedb.test" |awk '{print $2}'`
+# compute and return sha1 hash so probe can verify it
+  echo "$id:$protocol:$port:$salt" |sha1sum |awk '{print $1}'
+else
+  exit 1
+fi
+
