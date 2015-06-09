@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Configure monitored ports
+monitored_tcp=(21 22 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
+monitored_udp=(123 1194 4500 5000-5110 7000-7007)
+
+for port in ${monitored_udp[@]}
+  do
+  if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
+  then
+    range_start="${BASH_REMATCH[1]}"
+    range_end="${BASH_REMATCH[2]}"
+#    if [[ $range_start -lt $range_end ]] ;
+#    then
+#      for ((i=1, j=10; i <= 5 ; i++, j=j+5))
+#        do
+    echo "Range from $range_start to $range_end"
+  else
+    echo $port
+  fi
+
+
+done
+
+
+
+
+
+
+
+
+
+## Eduroam tech spec requirements:                                                                                                          
+## Scannable ports                                                                                                                          
+#45.3. IPSec NAT traversal:                     UDP/4500 egress and established.                                                            
+#45.4. Cisco IPSec NAT traversal:               UDP/10000; TCP/10000 egress and established.                                                
+#45.6. OpenVPN:                                 UDP/1194; TCP/1194 egress and established;                                                  
+#                                               UDP/5000-5110 egress and established                                                        
+#45.7. NTP:                                     UDP/123 egress and established                                                              
+#45.8. SSH:                                     TCP/22 egress and established.                                                              
+#45.9. HTTP:                                    TCP/80 egress and established.                                                              
+#45.10. HTTPS:                                  TCP/443 egress and established.                                                             
+#45.11. LDAP:                                   TCP/389 egress and established.
+#45.12. LDAPS:                                  TCP/636 egress and established.
+#45.13. IMSP:                                   TCP/406 egress and established.
+#45.14. IMAP4:                                  TCP/143 egress and established.
+#45.15. IMAP3:                                  TCP/220 egress and established.
+#45.16. IMAPS:                                  TCP/993 egress and established.
+#45.17. POP:                                    TCP/110 egress and established.
+#45.18. POP3S:                                  TCP/995 egress and established.
+#45.19. Passive (S)FTP:                         TCP/21 egress and established.
+#45.20. SMTPS:                                  TCP/465 egress and established.
+#45.21. Message submission:                     TCP/587 egress and established.
+#45.22. RDP:                                    TCP/3389 egress and established.
+#45.23. VNC:                                    TCP/5900 egress and established.
+#45.24. Citrix:                                 TCP/1494 egress and established.
+#45.25. AFS:                                    UDP/7000 through UDP/7007 inclusive egress and established.
+#45.29. SQUID Proxy:                            TCP/3128 egress and established
+#45.30. HTTP Proxy:                             TCP/8080 egress and established
+
+# Ports/services requiring full application implementation for accurate detection
+#45.5. PPTP:                                    IP protocol 47 (GRE) egress and established; 
+#                                               TCP/1723 egress and established.
+#45.26. ESP:                                    IP protocol 50 egress and established
+#45.27. AH:                                     IP protocol 51 egress and established
+#45.28. ISAKMP: and IKE:                        UDP/500 egress
+#45.1. IPv6 Tunnel Broker NAT traversal:        UDP/3653;TCP/3653 egress and established.                                                   
+#45.2. IPv6 Tunnel Broker Service:              IP protocol 41 egress and established.                                                      
