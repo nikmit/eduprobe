@@ -18,6 +18,7 @@ for port in ${monitored_udp[@]}
       for ((i=$range_start; i <= $range_end; i++))
       do
 #	echo "added $i at $index"
+	
       done
     else
       echo "Range starts with value larger than the one it ends with"
