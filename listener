@@ -1,2 +1,14 @@
 #!/bin/bash
-while true ; do nc -l -p 1234 -e /srv/responder ; done
+
+proto=$1
+port=$2
+
+if [[ $proto == 'tcp' ]]
+then
+  while true ; do nc -l -p $port -e ./responder ; done
+elif [[ $proto == 'udp' ]]
+then
+  while true ; do nc -l -u -p $port -e ./responder ; done
+else
+  echo "Invalid port specified: $port"
+fi
