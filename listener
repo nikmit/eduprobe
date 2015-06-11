@@ -5,10 +5,10 @@ port=$2
 
 if [[ $proto == 'tcp' ]]
 then
-  while true ; do nc -l -p $port -e ./responder ; done
+  while [[ $? == 0 ]] ; do nc -l -p $port -e ./responder ; done
 elif [[ $proto == 'udp' ]]
 then
-  while true ; do nc -l -u -p $port -e ./responder ; done
+  while [[ $? == 0 ]] ; do nc -l -u -p $port -e ./responder ; done
 else
   echo "Invalid port specified: $port"
 fi
