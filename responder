@@ -5,6 +5,7 @@ read response
 
 # it should be in format probeID:proto:port
 regex="([0-9]+):(tcp|udp):([0-9]+)"
+echo "resp: $response"
 
 # if data is in the expected format
 if [[ "$response" =~ $regex ]];
@@ -18,6 +19,7 @@ then
 # compute and return sha1 hash so probe can verify it
   echo "$id:$protocol:$port:$salt" |sha1sum |awk '{print $1}'
 else
+  echo "can't read input: $response"
   exit 1
 fi
 

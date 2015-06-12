@@ -1,17 +1,26 @@
 #!/bin/bash
 
-# Configure monitored ports
-monitored_tcp=(21 22 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
-monitored_udp=(123 1194 4500 5000-5110 7000-7007)
+# Configure monitored ports - tcp/22 and udp/123 removed for testing
+#monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
+#monitored_udp=(1194 4500 5000-5110 7000-7007)
+monitored_tcp=(21 80 110)
+monitored_udp=(7000-7007)
+proto=''
+id='1045'
 
 function scan {
   ### Expand ranges in config array into an array of single ports
-  local allports=''
-  local index=0
-  for port in $@
+#  local allports=''
+#  local index=0
+  for dat in $@
     do
+    if [[ $dat =~ [tcp|udp] ]]
+    then
+      proto=$dat
+      continue
+    fi
     # check for ranges in array and expand them
-    if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
+    if [[ $dat =~ ([0-9]+)-([0-9]+) ]] ;
     then
       range_start="${BASH_REMATCH[1]}"
       range_end="${BASH_REMATCH[2]}"
@@ -19,29 +28,38 @@ function scan {
       then
         for ((i=$range_start; i <= $range_end; i++))
         do
-  	echo "added $i at $index"
-	allports[$index]=$i
-  	((index++))
+	  if [[ $proto -eq 'udp' ]]
+	  then
+	    rhash=$(echo \"$id:$proto:$i\" |nc -u localhost $i)
+	    echo "ranged hash: $rhash"
+	  elif [[ $proto -eq 'tcp' ]]
+	  then
+	    rhash=$(echo \"$id:$proto:$i\" |nc localhost $i)
+            echo "ranged hash: $rhash"
+	  fi
         done
       else
         echo "Range starts with value larger than the one it ends with"
         exit 1
       fi
     # if not a range just add it
-    elif [[ $port =~ ^[0-9]+$ ]]
+    elif [[ $dat =~ ^[0-9]+$ ]]
     then
-      echo "added $port at $index"
-      allports[$index]=$i
-      ((index++))
+#      echo "added $dat at $index"
+#      allports[$index]=$i
+#      ((index++))
+       rhash=$(echo \"$id:$proto:$dat\" |nc localhost $dat)
+       echo "hash: $rhash"
     else 
-      echo "Please check monitored ports configuration, $port doesn't look right"
+      echo "Please check monitored ports configuration, $dat doesn't look right"
       exit 1
     fi
   done
   ### Test ports
 }
 
-scan ${monitored_tcp[@]}
+scan "tcp" ${monitored_tcp[@]}
+scan "udp" ${monitored_udp[@]}
 
 
 
