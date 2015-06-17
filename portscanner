@@ -30,6 +30,7 @@ function scan {
         do
 	  if [[ $proto -eq 'udp' ]]
 	  then
+# socat UDP4-LISTEN:8080,fork EXEC:/srv/script/eduprobe/responder,pty,stderr
 	    rhash=$(echo \"$id:$proto:$i\" |nc -u localhost $i)
 	    echo "ranged hash: $rhash"
 	  elif [[ $proto -eq 'tcp' ]]
