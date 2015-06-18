@@ -1,0 +1,309 @@
+###### Build firmware image #####
+install required build envirnment prereqs:
+	git subversion perl-devel gcc-c++ glibc glibc-devel ncurses-devel zlib-devel flex unzip
+	apt-get install git subversion libperl-dev zlib1g-dev flex unzip libncurses5-dev libc-dev-bin gcc # may not be definitive... :)
+
+cd /usr/local/src
+git clone git://git.openwrt.org/openwrt.git
+cd openwrt
+
+edit feeds.conf.default
+	comment out unneeded sections, e.g. luci, telephony (update will be slightly faster, can be skipped)
+	do
+		./scripts/feeds update -a
+	and
+		./scripts/feeds search kmod-loop-aes
+	to check if the kmod-loop-aes package has been moved to the default packages feed
+	if it is not there, uncomment oldpackages (src-git oldpackages http://git.openwrt.org/packages.git)
+	and update againg
+		./scripts/feeds update -a
+
+The feeds script downloads the loop-aes package, currently the wrong version of it for the util-linux package distributed with the current openwrt trunk. To get the right version edit feeds/oldpackages/utils/loop-aes/Makefile and update the version and its checksum
+One way of getting the new checksum is looking at the error which make dies with if you don't update the checksum :)
+	- PKG_VERSION:=3.7a
+	+ PKG_VERSION:=3.7c
+	- PKG_MD5SUM:=some hex (current checksum)
+	+ PKG_MD5SUM:=73f1ffbe9108d24e70abc9f06ff3bbc0
+
+Remove this patch as it breaks build
+	rm feeds/oldpackages/utils/loop-aes/patches/001-no_sync.patch
+
+Install the loop-aes package so it becomes available as an option during make menuconfig.
+	./scripts/feeds install kmod-loop-aes
+
+The logic of getting the util-linux package patched correctly to support loop-aes:
+	1. get the version of util-linux from package/utils/util-linux/Makefile
+	2. check which version of loop-aes contains the right patch (loop-aes.sourceforge.net/loop-AES/)
+		e.g. util-linux 2.25.2 needs util-linux-2.25.2.diff which is provided with loop-aes v3.7c
+	3. copy that patch to package/utils/util-linux/patches/
+	4. rename the patch by prepending a 00n number, so it has the greatest number in the folder (e.g. 004-util-linux-2.25.2.diff)
+	5. check the kmod-loop-aes feed is configured to download that package as described above (edit feeds/oldpackages/utils/loop-aes/Makefile)
+
+Edit package/network/services/hostapd/files/wpa_supplicant-full.config
+	add to the end of the file:
+
+        CONFIG_INTERWORKING=y
+                # Hotspot 2.0
+                CONFIG_HS20=y
+
+add the 'files' directory to /usr/local/src/openwrt (the current build dir).
+	This dir contains configuration items which will get pre-applied to the compiled firmware image. Example: the current main trunk version of openwrt causes dropbear to fail to load if it is configured to listen on a named interface only and that interface is not up with an IP at the time of dropbear init.
+	Added files/etc/hotplug.d/iface/40-dropbear:
+		#!/bin/sh
+
+		if [ "$INTERFACE" = "lan" ] && [ "$ACTION" = "ifup" ]
+		then
+		        /etc/init.d/dropbear restart
+		fi
+	This restarts dropbear on interface line state up. In theory this should guarantee that the probe boots with SSH available, in practice some sort of race condition is still there and occasionally it is needed to unplug/plug in the ethernet cable to bring up dropbear after boot
+
+make defconfig
+make prereq
+make menuconfig
+
+        • Target System (Atheros AR7xxx/AR9xxx)
+        • Target Profile (TP-Link TL-MR3020)
+        • Base System
+                • block-mount
+                • wireless-tools
+        • Kernel Modules
+                • Block Devices
+                        • kmod-scsi-core
+                • Cryptographic API modules
+                        • kmod-crypto-iv
+                        • kmod-crypto-sha1
+                        • kmod-crypto-xts
+                        • kmod-loop-aes
+                • Filesystems
+                        • kmod-fs-ext4
+                • USB Support
+                        • kmod-usb-storage
+        • Network
+                • wpad-mini (UNSELECT)
+                • wpa-cli
+                • wpa-supplicant
+        • Utilities
+                • losetup
+
+To build on a machine with n CPUs (if overall load is not a concern)
+	make -jn
+If this errors out, debug build with 
+	make -j1 V=s
+or (for a cleaner screen):
+	make -j1 V=s > make.log 2&>1
+
+Once make is done, the firmware image is at bin/ar71xx/openwrt-ar71xx-generic-tl-mr3020-v1-squashfs-factory.bin
+
+
+
+###### Prepare USB Stick ######
+
+fdisk /dev/sdb 
+create two partitions
+1. primary +14G
+2. primary
+
+mkfs.ext4 /dev/sdb1
+
+
+###### Install OpenWRT on MR3020 ###### - for new probes
+
+Configure your device with IP Address 192.168.0.1 / 24
+Connect probe to your device with ethernet cable
+Then run:
+
+./flash-firmware openwrt-ar71xx-generic-tl-mr3020-v1-squashfs-factory.bin
+
+
+Once the 2nd Curl timesout. You can unplug the network but must leave the Probe powered.
+IMPORTANT: DO NOT REMOVE THE POWER FROM THE MR3020 UNTIL IT REBOOTS
+
+##### for probes with modified image ####
+power up
+when reset btn starts flashing pres snad hold untill it flashes quickly
+
+telnet to 192.168.1.1
+mount_root 	# moutn root
+dropbear	# starts ssh service
+add rsa key to authorized_keys (/etc/dropbear/authorized_keys)
+exit (or scp from a new terminal)
+scp imagename root@192.168.1.1:/tmp
+telnet back into it
+cd /tmp
+mtd -r write imagename firmware
+# will reboot, after that it is ready
+check logs on staff-dhcp-1 to get the new IP
+
+
+###### Prep Probe ######
+
+Insert USB stick into probe AFTER the probe has been rebooted...now before its powered on.
+
+Connect probe to network (probe will need to download some packages and requires working Internet)
+Boot probe
+
+###### Copy filesystem to USB ######
+
+mount /dev/sda1 /mnt
+tar -C /overlay -cvf - . | tar -C /mnt  -xf -
+cp /etc/rc.local /mnt/etc
+
+
+
+###### Update FSTAB on USB to mount MR3020 flash ######
+
+vi /mnt/etc/config/fstab
+add:
+
+config mount
+	option target	/overlay-boot
+	option device	/dev/mtdblock3
+	option fstype	jffs2
+	option options	rw,sync
+	option enabled	1
+	option enabled_fsck 0
+
+$ printf "config mount\n\toption target   /overlay-boot\n\toption device   /dev/mtdblock3\n\toption fstype   jffs2\n\toption options  rw,sync\n\toption enabled  1\n\toption enabled_fsck 0\n" >> /mnt/etc/config/fstab
+
+###### Update FSTAB on MR3020 to mount USB ######
+
+First get UUID of sda1:
+using block detect
+
+$ block detect | grep uuid | awk {'print $3'}
+
+
+vi /etc/config/fstab
+add:
+
+config mount
+	option target	/overlay
+option uuid ‘value from block detect for sda1'
+option fstype ext4
+option options	rw,sync,noatime
+option enabled	1
+option enabled_fsck 0
+
+$ printf "config mount\n\toption target /overlay\n\toption uuid `block detect | grep uuid | awk {'print $3'}`\n\toption fstype   ext4\n\toption options  rw,sync\n\toption enabled  1\n\toption enabled_fsck 0\n" >> /etc/config/fstab
+
+
+NOTE all the option lines should be TAB indented...they arent in this doc because it means
+that cut and paste works! :\
+
+Make sure the /etc/fstab symlink points to /etc/config/fstab rather than /tmp/fstab (not sure if this matters? itnm)
+
+
+###### Create key to encrypt credentials ######
+
+On linux box type:
+cat /dev/urandom| tr -dc 'a-zA-Z0-9-_!@#$%^&*()_+{}|:<>?='|fold -w 30| head -n 1| sha256sum
+
+On OSX box type:
+cat /dev/urandom| LC_CTYPE=C tr -dc 'a-zA-Z0-9-_!@#$%^&*()_+{}|:<>?='|fold -w 30| head -n 1| shasum -a 256
+
+on MR3020 copy the value (only the first string...ignore the dash!) into:
+/etc/cred-key
+
+change /etc/rc.local
+- losetup -P /overlay-boot/etc/cred-key -e aes128 /dev/loop0 /dev/sda2
++ losetup -P /etc/cred-key -e aes128 /dev/loop0 /dev/sda2
+
+###### Reboot MR3020 ######
+don't unplug probe to reboot - issue 'reboot' command
+
+log back into probe.  df -h should now show:
+
+/dev/sda1 12.9G for /overlay
+/dev/mtdblock3 for /overlay-boot
+
+###### Create encrypted credentials volume ######
+
+opkg update
+opkg install e2fsprogs
+mkfs.ext4 /dev/loop0	# at this point losetup should have this linked to /dev/sda2 already, as defined in /etc/rc.local
+			# edited the command to look for creds in /etc/ rather than /overlay-boot/etc
+mkdir /mnt/creds
+
+###### Reboot MR3020 ######
+
+###### Copy eduroam code to probe ########
+
+From your desktop scp the code to the probe
+
+scp eduProbe.tar root@<probe ipadd>:
+
+then login to the probe (again).
+
+tar xvf eduProbe.tar 
+cd etc
+mv eduroam_monitor /etc/
+
+
+###### Install Required Packages ######
+
+opkg update
+opkg install ip bash coreutils-sha1sum curl ntpdate
+
+###### Configure Probe ID ######
+
+Get mac address of eth0 and store in /etc/eduroam_monitor/salt
+
+ip link show eth0 | awk '/ether/ {print $2}' > /etc/eduroam_monitor/salt
+
+Add the MAC addr (what you've just put into /etc/eduroam_monitor/salt) and Organisation ID (got
+via the eduroam UK support server) into the shared spreadsheet and get its Probe ID
+
+write the probe id to the probe:
+
+echo <PROBE ID> > /etc/eduroam_monitor/probeId
+
+
+###### Create Credentials ######
+
+login to support server
+create credentials in /etc/raddb/users
+
+username = eduprobe+ProbeID 
+e.g. eduprobe1000
+
+to generate a password, on linux type:
+cat /dev/urandom| tr -dc 'a-zA-Z0-9'|fold -w 18| head -n 1
+
+on OSX its:  cat /dev/urandom| LC_CTYPE=C tr -dc 'a-zA-Z0-9'|fold -w 18| head -n 1
+
+
+restart radius on support server
+
+On probe run:
+
+/etc/eduroam_monitor/generateCreds.sh <username> <password>
+
+then check one of the config files in /etc/eduroam_monitor/wpa_conf to ensure the password is correct
+
+###### Add Probe to password file for updates #######
+
+on the support server type:
+
+htpasswd /usr/local/probe-web-passwords <PROBE-ID>
+
+the password is the value in the salt file on the probe:
+/etc/eduroam_monitor/salt  (on probe)
+
+###### change eth0 to be static ######
+
+edit /etc/config/network so that the lan looks like:
+
+config interface 'lan'
+	option ifname 'eth0'
+option proto 'static'
+option 'ipaddr' '192.168.1.254'
+option 'netmask' '255.255.255.0'  
+
+config interface 'wifi'
+	option ifname 'wlan0'
+
+(once again all option lines are TAB indented...but not in this doc to allow for cut and paste!)
+
+######
+
+Print and stick probe label on probe.
