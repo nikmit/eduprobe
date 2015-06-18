@@ -5,10 +5,13 @@ port=$2
 
 if [[ $proto == 'tcp' ]]
 then
-  while [[ $? == 0 ]] ; do nc -l -p $port -e ./responder ; done
+#socat UDP4-LISTEN:8080,fork EXEC:/srv/script/eduprobe/responder,pty,stderr
+# add an option to responder so the port can be preset here
+# e.g. socat UDP4-LISTEN:8080,fork EXEC:/srv/script/eduprobe/responder 8080,pty,stderr
+  while [[ $? == 0 ]] ; do nc -vv -l -p $port -e ./responder ; done
 elif [[ $proto == 'udp' ]]
 then
-  while [[ $? == 0 ]] ; do nc -l -u -p $port -e ./responder ; done
+  while [[ $? == 0 ]] ; do nc -vv -l -u -p $port -e ./responder ; done
 else
   echo "Invalid port specified: $port"
 fi

@@ -1,19 +1,23 @@
 #!/bin/bash
 
+# get the intended dst port
+port=$1
+proto=$2
+
 # read the string supplied by the probe
 read response
 
 # it should be in format probeID:proto:port
-regex="([0-9]+):(tcp|udp):([0-9]+)"
-echo "resp: $response"
+#regex="([0-9]+):(tcp|udp):([0-9]+)"
+echo "resp: $response port:$port proto:$proto"
 
-# if data is in the expected format
-if [[ "$response" =~ $regex ]];
+# if data is in the expected format (4 digit probe ID)
+if [[ "$response" =~ [0-9]{4} ]];
 then
 # set variables based on supplied string
-  id="${BASH_REMATCH[1]}"
-  protocol="${BASH_REMATCH[2]}"
-  port="${BASH_REMATCH[3]}"
+  id=$response
+#  protocol="${BASH_REMATCH[2]}"
+#  port="${BASH_REMATCH[3]}"
 # get the locally stored salt for this probe ID
   salt=`grep "$id" "probedb.test" |awk '{print $2}'`
 # compute and return sha1 hash so probe can verify it

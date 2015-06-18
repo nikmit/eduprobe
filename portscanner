@@ -4,23 +4,19 @@
 #monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
 #monitored_udp=(1194 4500 5000-5110 7000-7007)
 monitored_tcp=(21 80 110)
-monitored_udp=(7000-7007)
-proto=''
+monitored_udp=(1194 7000-7007)
+protocols=('tcp' 'udp')
 id='1045'
 
-function scan {
   ### Expand ranges in config array into an array of single ports
 #  local allports=''
 #  local index=0
-  for dat in $@
-    do
-    if [[ $dat =~ [tcp|udp] ]]
-    then
-      proto=$dat
-      continue
-    fi
+  
+function scan {
+  for port in ${arr[0]}
+  do
     # check for ranges in array and expand them
-    if [[ $dat =~ ([0-9]+)-([0-9]+) ]] ;
+    if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
     then
       range_start="${BASH_REMATCH[1]}"
       range_end="${BASH_REMATCH[2]}"
@@ -28,39 +24,44 @@ function scan {
       then
         for ((i=$range_start; i <= $range_end; i++))
         do
-	  if [[ $proto -eq 'udp' ]]
-	  then
-# socat UDP4-LISTEN:8080,fork EXEC:/srv/script/eduprobe/responder,pty,stderr
-	    rhash=$(echo \"$id:$proto:$i\" |nc -u localhost $i)
-	    echo "ranged hash: $rhash"
-	  elif [[ $proto -eq 'tcp' ]]
-	  then
-	    rhash=$(echo \"$id:$proto:$i\" |nc localhost $i)
-            echo "ranged hash: $rhash"
-	  fi
-        done
+	  echo "testing '$id:$proto:$i |$cmd $i'"
+	  rhash=$(echo \"$id:$proto:$i\" |$cmd $i)
+	  echo "ranged hash: $rhash"
+	done
       else
         echo "Range starts with value larger than the one it ends with"
         exit 1
       fi
     # if not a range just add it
-    elif [[ $dat =~ ^[0-9]+$ ]]
+    elif [[ $port =~ ^[0-9]+$ ]]
     then
-#      echo "added $dat at $index"
-#      allports[$index]=$i
-#      ((index++))
-       rhash=$(echo \"$id:$proto:$dat\" |nc localhost $dat)
-       echo "hash: $rhash"
+      echo "testing '$id:$proto:$port |$cmd'"
+      rhash=$(echo \"$id:$proto:$port\" |$cmd $port)
+      echo "hash: $rhash"
     else 
-      echo "Please check monitored ports configuration, $dat doesn't look right"
+      echo "Please check monitored ports configuration, $port doesn't look right"
       exit 1
     fi
   done
   ### Test ports
 }
 
-scan "tcp" ${monitored_tcp[@]}
-scan "udp" ${monitored_udp[@]}
+for proto in ${protocols[@]}
+do
+  if [[ $proto == 'udp' ]]
+  then
+    echo "scanning $proto"
+    arr=${monitored_udp[@]}
+    cmd='nc -u -w 1 localhost'
+    scan
+  elif [[ $proto == 'tcp' ]]
+  then
+    echo "scanning $proto"
+    arr=${monitored_tcp[@]}
+    cmd='nc localhost'
+    scan
+  fi
+done
 
 
 
