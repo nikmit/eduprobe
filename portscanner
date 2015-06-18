@@ -5,6 +5,7 @@ monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 
 monitored_udp=(1194 4500 5000-5110 7000-7007)
 #monitored_tcp=(21 80 110)
 #monitored_udp=(1194 7000-7007)
+target='localhost'		# ip of the target server hosting the listening processes
 protocols=('tcp' 'udp')
 id='1045'			# in production this should be dynamically taken from file system on the probe
 salt='c04a00cc8406'		# this too
@@ -65,19 +66,19 @@ do
   then
     #echo "scanning $proto"
     arr=${monitored_udp[@]}
-    cmd='nc -u -w 1 localhost'
+    cmd="nc -u -w 1 -n $target"		# -n = don't look for (r)DNS | -u = UDP | -w 1 = close connection after 1 sec (if still open)
     scan
   elif [[ $proto == 'tcp' ]]
   then
     #echo "scanning $proto"
     arr=${monitored_tcp[@]}
-    cmd='nc localhost'
+    cmd="nc -w 1 -n $target"
     scan
   fi
 done
 
-
-
+# current result delivery format
+#echo "test=nat&result=$RESULT&message=$ERROR&time=$(date +%Y%m%d)_$(date +%H%M%S)"
 
 
 
