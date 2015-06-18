@@ -1,21 +1,18 @@
 #!/bin/bash
 
 # Configure monitored ports - tcp/22 and udp/123 removed for testing
-#monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
-#monitored_udp=(1194 4500 5000-5110 7000-7007)
-monitored_tcp=(21 80 110)
-monitored_udp=(1194 7000-7007)
+monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
+monitored_udp=(1194 4500 5000-5110 7000-7007)
+#monitored_tcp=(21 80 110)
+#monitored_udp=(1194 7000-7007)
 protocols=('tcp' 'udp')
-id='1045'
+id='1045'			# in production this should be dynamically taken from file system on the probe
+salt='c04a00cc8406'		# this too
 
-  ### Expand ranges in config array into an array of single ports
-#  local allports=''
-#  local index=0
-  
 function scan {
-  for port in ${arr[0]}
+  for port in ${arr[@]}
   do
-    # check for ranges in array and expand them
+    # check for ranges in array and expand them before testing
     if [[ $port =~ ([0-9]+)-([0-9]+) ]] ;
     then
       range_start="${BASH_REMATCH[1]}"
@@ -24,39 +21,55 @@ function scan {
       then
         for ((i=$range_start; i <= $range_end; i++))
         do
-	  echo "testing '$id:$proto:$i |$cmd $i'"
-	  rhash=$(echo \"$id:$proto:$i\" |$cmd $i)
-	  echo "ranged hash: $rhash"
+	  echo "testing '$id |$cmd $i'"
+	  rhash=$(echo $id |$cmd $i)
+	  #echo "verifying hash:"
+	  #echo "provided  : $rhash"
+	  lhash=`echo "$id:$proto:$i:$salt" |sha1sum |awk '{print $1}'`
+	  #echo "calculated: $lhash"
+	  if [[ $rhash == $lhash ]]
+	  then
+	    echo "$proto/$i - OK"
+	  else
+	    echo "$proto/$i - FAIL"
+	  fi
 	done
       else
         echo "Range starts with value larger than the one it ends with"
         exit 1
       fi
-    # if not a range just add it
+    # if not a range just test it
     elif [[ $port =~ ^[0-9]+$ ]]
     then
-      echo "testing '$id:$proto:$port |$cmd'"
-      rhash=$(echo \"$id:$proto:$port\" |$cmd $port)
-      echo "hash: $rhash"
+      echo "testing '$id |$cmd $port'"
+      rhash=$(echo $id |$cmd $port)
+      #echo "verifying hash: $rhash"
+      lhash=`echo "$id:$proto:$port:$salt" |sha1sum |awk '{print $1}'`
+      #echo "lhash: $lhash"
+      if [[ $rhash == $lhash ]]
+      then
+	echo "$proto/$port - OK"
+      else
+	echo "$proto/$port - FAIL"
+      fi
     else 
-      echo "Please check monitored ports configuration, $port doesn't look right"
+      echo "Please check monitored ports configuration, failed to parse $port"
       exit 1
     fi
   done
-  ### Test ports
 }
 
 for proto in ${protocols[@]}
 do
   if [[ $proto == 'udp' ]]
   then
-    echo "scanning $proto"
+    #echo "scanning $proto"
     arr=${monitored_udp[@]}
     cmd='nc -u -w 1 localhost'
     scan
   elif [[ $proto == 'tcp' ]]
   then
-    echo "scanning $proto"
+    #echo "scanning $proto"
     arr=${monitored_tcp[@]}
     cmd='nc localhost'
     scan

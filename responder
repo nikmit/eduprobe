@@ -1,29 +1,20 @@
 #!/bin/bash
 
-# get the intended dst port
-port=$1
-proto=$2
+proto=$1								# protocol and port provided locally at initialisation of listener
+port=$2
 
-# read the string supplied by the probe
-read response
+read probeid								# read probe id as received by socat listener from probe
 
-# it should be in format probeID:proto:port
-#regex="([0-9]+):(tcp|udp):([0-9]+)"
-echo "resp: $response port:$port proto:$proto"
+#echo "probe: $probeid port:$port proto:$proto"
 
-# if data is in the expected format (4 digit probe ID)
-if [[ "$response" =~ [0-9]{4} ]];
+if [[ "$probeid" =~ ^[0-9]{4}$ ]];					# verify format of supplied probe id
 then
-# set variables based on supplied string
-  id=$response
-#  protocol="${BASH_REMATCH[2]}"
-#  port="${BASH_REMATCH[3]}"
-# get the locally stored salt for this probe ID
-  salt=`grep "$id" "probedb.test" |awk '{print $2}'`
-# compute and return sha1 hash so probe can verify it
-  echo "$id:$protocol:$port:$salt" |sha1sum |awk '{print $1}'
+  salt=`grep "$probeid" "probedb.test" |awk '{print $2}'`		# get the locally stored salt for this probe ID
+#  echo "hashing $probeid:$proto:$port:$salt"
+  h=`echo "$probeid:$proto:$port:$salt" |sha1sum |awk '{print $1}'`	# compute sha1 hash
+  echo $h								# return hash to probe so it can verify it
 else
-  echo "can't read input: $response"
+  echo "failed to parse probe id: $probeid"
   exit 1
 fi
 
