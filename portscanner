@@ -5,10 +5,14 @@ monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 
 monitored_udp=(1194 4500 5000-5110 7000-7007)
 #monitored_tcp=(21 80 110)
 #monitored_udp=(1194 7000-7007)
-target='localhost'		# ip of the target server hosting the listening processes
+#target='127.0.0.1'		# ip of the target server hosting the listening processes
+target=158.125.10.31
 protocols=('tcp' 'udp')
-id='1045'			# in production this should be dynamically taken from file system on the probe
-salt='c04a00cc8406'		# this too
+#id=1045'			# in production this should be dynamically taken from file system on the probe
+#salt='c04a00cc8406'		# this too
+
+id=$(cat /etc/eduroam_monitor/probeId)
+salt=$(cat /etc/eduroam_monitor/salt |sed '{s/://g}')
 
 function scan {
   for port in ${arr[@]}
@@ -23,7 +27,7 @@ function scan {
         for ((i=$range_start; i <= $range_end; i++))
         do
 	  echo "testing '$id |$cmd $i'"
-	  rhash=$(echo $id |$cmd $i)
+	  rhash=$(echo $id |$cmd $i & sleep 1 ; kill $!)
 	  #echo "verifying hash:"
 	  #echo "provided  : $rhash"
 	  lhash=`echo "$id:$proto:$i:$salt" |sha1sum |awk '{print $1}'`
@@ -43,7 +47,7 @@ function scan {
     elif [[ $port =~ ^[0-9]+$ ]]
     then
       echo "testing '$id |$cmd $port'"
-      rhash=$(echo $id |$cmd $port)
+      rhash=$(echo $id |$cmd $port & sleep 1 ; kill $!)
       #echo "verifying hash: $rhash"
       lhash=`echo "$id:$proto:$port:$salt" |sha1sum |awk '{print $1}'`
       #echo "lhash: $lhash"
@@ -66,7 +70,7 @@ do
   then
     #echo "scanning $proto"
     arr=${monitored_udp[@]}
-    cmd="nc -u -w 1 -n $target"		# -n = don't look for (r)DNS | -u = UDP | -w 1 = close connection after 1 sec (if still open)
+    cmd="nc -u -n $target"		# -n = don't look for (r)DNS | -u = UDP | -w 1 = close connection after 1 sec (if still open)
     scan
   elif [[ $proto == 'tcp' ]]
   then
