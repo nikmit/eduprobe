@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # Configure monitored ports - tcp/22 and udp/123 removed for testing
-monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
-monitored_udp=(1194 4500 5000-5110 7000-7007)
-#monitored_tcp=(21 80 110)
-#monitored_udp=(1194 7000-7007)
-#target='127.0.0.1'		# ip of the target server hosting the listening processes
-target=158.125.10.31
 protocols=('tcp' 'udp')
-#id=1045'			# in production this should be dynamically taken from file system on the probe
-#salt='c04a00cc8406'		# this too
+#monitored_tcp=(21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080)
+#monitored_udp=(1194 4500 5000-5110 7000-7007)
+target=158.125.10.31
+#id=$(cat /etc/eduroam_monitor/probeId)
+#salt=$(cat /etc/eduroam_monitor/salt |sed '{s/://g}')
+monitored_tcp=(21 80 110)
+monitored_udp=(1194 7000-7007)
+#target='127.0.0.1'		# ip of the target server hosting the listening processes
+id='1045'			# in production this should be dynamically taken from file system on the probe
+salt='c04a00cc8406'		# this too
 
-id=$(cat /etc/eduroam_monitor/probeId)
-salt=$(cat /etc/eduroam_monitor/salt |sed '{s/://g}')
 
 function scan {
   for port in ${arr[@]}
@@ -27,7 +27,7 @@ function scan {
         for ((i=$range_start; i <= $range_end; i++))
         do
 	  echo "testing '$id |$cmd $i'"
-	  rhash=$(echo $id |$cmd $i & sleep 1 ; kill $!)
+	  rhash=$(echo $id |$cmd $i & sleep 1 ; kill $! 2> /dev/null)
 	  #echo "verifying hash:"
 	  #echo "provided  : $rhash"
 	  lhash=`echo "$id:$proto:$i:$salt" |sha1sum |awk '{print $1}'`
@@ -47,7 +47,7 @@ function scan {
     elif [[ $port =~ ^[0-9]+$ ]]
     then
       echo "testing '$id |$cmd $port'"
-      rhash=$(echo $id |$cmd $port & sleep 1 ; kill $!)
+      rhash=$(echo $id |$cmd $port & sleep 1 ; kill $! 2> /dev/null)
       #echo "verifying hash: $rhash"
       lhash=`echo "$id:$proto:$port:$salt" |sha1sum |awk '{print $1}'`
       #echo "lhash: $lhash"
@@ -77,6 +77,7 @@ do
     #echo "scanning $proto"
     arr=${monitored_tcp[@]}
     cmd="nc -w 1 -n $target"
+    timeout=''
     scan
   fi
 done
