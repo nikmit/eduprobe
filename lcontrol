@@ -7,6 +7,7 @@ use Data::Dumper;
 my @monitored_tcp = qw (21 80 110);
 my @monitored_udp = qw (1194 7000-7007);
 my @protocols = qw (tcp udp);
+my $socat_timeout = 60;
 #my @monitored_tcp = qw (21 80 110 143 220 389 406 443 465 587 636 993 995 1194 1494 3128 3389 5900 8080);
 #my @monitored_udp = qw (1194 4500 5000-5110 7000-7007);
 
@@ -58,7 +59,7 @@ sub start {
   &check_used_ports;
   foreach my $proto (keys %monitored_all) {
     P: foreach my $port (keys %{$monitored_all{$proto}}) {
-      if (system ("/usr/bin/socat ${proto}4-LISTEN:$port,fork EXEC:\"/srv/script/eduprobe/responder $proto $port\" &") == 0) {
+      if (system ("/usr/bin/socat -T${socat_timeout} ${proto}4-LISTEN:$port,fork EXEC:\"/srv/script/eduprobe/responder $proto $port\" &") == 0) {
 	$i++;
         print "started listener for v4 $proto/$port\n";
       } else {
