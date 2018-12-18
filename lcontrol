@@ -109,7 +109,7 @@ sub check_used_ports {
 }
 
 sub stop {
-  system("killall socat");
+  system("pkill socat");
 #  my @ps = `/bin/ps ax`;
 #  my $i = 0;
 #  foreach (@ps) {
